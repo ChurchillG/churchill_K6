@@ -2,147 +2,117 @@
 
 ## Project Overview
 
-This project is a K6 performance test suite for a sample API hosted at `https://www.ndosiautomation.co.za/APIDEV`.
-It performs a complete user flow: login, profile retrieval, testimonial creation, update, and deletion.
-The test uses modular service and scenario files, then generates both an HTML report and a JSON summary.
+`Churchill_K6` is a K6 performance test suite targeting the API at `https://www.ndosiautomation.co.za/APIDEV`.
+The suite executes an authenticated user flow that logs in, retrieves a profile, creates a testimonial, updates it, and then deletes it.
+The test produces two outputs after execution: `report.html` and `summary.json`.
 
 ## Repository Structure
 
-- `main.js` - K6 entry point and test configuration.
+- `main.js` - K6 entry point, load test configuration, and report generation.
 - `README.md` - Project documentation.
-- `report.html` - Generated HTML report after running the K6 test.
-- `summary.json` - Generated JSON summary after running the K6 test.
-- `config/config.js` - Holds base URL and user credentials.
-- `scenarios/userFlow.js` - Defines the user flow executed by the test.
-- `services/authService.js` - Handles login and authentication.
-- `services/userService.js` - Retrieves user profile information.
-- `services/testimonialService.js` - Creates, updates, and deletes testimonials.
-- `utils/checks.js` - Contains response validation helper functions.
+- `report.html` - Generated HTML performance report.
+- `summary.json` - Generated JSON summary of the test run.
+- `config/config.js` - API base URL and login credentials.
+- `scenarios/userFlow.js` - Orchestrates the end-to-end test scenario.
+- `services/authService.js` - Login/authentication helper.
+- `services/userService.js` - User profile retrieval helper.
+- `services/testimonialService.js` - Testimonial CRUD operations.
+- `utils/checks.js` - Response validation helper.
 
 ## How to Run
 
 1. Install [K6](https://k6.io/docs/getting-started/installation/).
-2. Open a terminal in this project folder.
+2. Open a terminal in the project root.
 3. Run:
 
 ```powershell
 k6 run main.js
 ```
 
-After the run completes, the test will generate:
-- `report.html` - human-readable performance report
-- `summary.json` - JSON test summary data
+After the run completes, the suite will generate:
+- `report.html` - human-readable performance report.
+- `summary.json` - raw K6 result data.
 
-## File-by-File Explanation
+## Current Test Flow
+
+The test follows this sequence:
+
+1. Login to the API using credentials from `config/config.js`.
+2. Retrieve the authenticated user profile.
+3. Create a new testimonial.
+4. Update the testimonial.
+5. Delete the testimonial.
+
+If any step fails, the flow logs an error and stops the dependent steps.
+
+## Key Files
 
 ### `main.js`
 
-This is the test entry point and includes three responsibilities:
-
-1. **Test Configuration**
-   - `options` sets the load test behavior:
-     - `vus: 5` runs 5 virtual users concurrently.
-     - `duration: '20s'` runs the test for 20 seconds.
-     - `thresholds` enforce performance goals:
-       - `http_req_duration: ['p(95)<500']` means 95% of HTTP requests must complete in under 500ms.
-       - `http_req_failed: ['rate<0.01']` means fewer than 1% of requests may fail.
-
-2. **Main Test Execution**
-   - The default exported function calls `userFlow()` from `scenarios/userFlow.js`, which executes the API workflow.
-
-3. **HTML Report Generation**
-   - `handleSummary(data)` is a K6 callback that runs after the test completes.
-   - It creates `report.html` using the imported `htmlReport` function.
-   - It also writes `summary.json` with the full K6 result data.
+- Configures K6 options:
+  - `vus: 5`
+  - `duration: '20s'`
+  - `thresholds` for request duration and failure rate.
+- Executes `userFlow()` from `scenarios/userFlow.js`.
+- Implements `handleSummary(data)` to write `report.html` and `summary.json`.
+- Uses `htmlReport` from the remote K6 reporter bundle.
 
 ### `config/config.js`
 
-Contains configuration values used by the test:
-
-- `BASE_URL`: the base API URL for all endpoint requests.
-- `USERS.validUser`: authentication credentials used for login.
-
-This file centralizes values that may change between environments.
+- `BASE_URL`: `https://www.ndosiautomation.co.za/APIDEV`
+- `USERS.validUser`: login credentials used by `authService.js`
 
 ### `scenarios/userFlow.js`
 
-Defines the user journey executed by the test:
-
-- `login()` performs authentication and returns a token.
-- `getProfile(token)` requests the authenticated user profile.
-- `createTestimonial(token)` creates a testimonial and returns its ID.
-- `updateTestimonial(token, id)` updates the testimonial using the returned ID.
-- `deleteTestimonial(token, id)` deletes the testimonial.
-
-This file orchestrates the flow so the test is easy to read and maintain.
+- Calls `login()` and validates that a token is returned.
+- Calls `getProfile(token)`.
+- Calls `createTestimonial(token)` and captures the testimonial ID.
+- Calls `updateTestimonial(token, id)` and `deleteTestimonial(token, id)`.
+- Logs a success message when the full flow completes.
 
 ### `services/authService.js`
 
-Handles login to the API.
-
-- Builds the login URL using `BASE_URL`.
-- Sends a POST request with `USERS.validUser` as JSON.
-- Uses `checkResponse()` to verify the response status is 200.
-- Returns the authentication token extracted from `res.body`.
+- Sends a POST request to `${BASE_URL}/login`.
+- Uses `USERS.validUser` as JSON payload.
+- Validates the response and extracts `data.token`.
+- Returns the auth token or `null` on failure.
 
 ### `services/userService.js`
 
-Retrieves the authenticated user profile.
-
 - Sends a GET request to `${BASE_URL}/profile`.
-- Adds the `Authorization: Bearer ${token}` header.
-- Uses `checkResponse()` to ensure the response status is 200.
+- Passes the `Authorization: Bearer <token>` header.
+- Validates that the response status is 200 or 201.
 
 ### `services/testimonialService.js`
 
-Performs testimonial create/update/delete operations.
-
 - `createTestimonial(token)`
-  - Sends a POST request to `${BASE_URL}/testimonials`.
-  - Includes a JSON body with `message: "Amazing service!"`.
-  - Uses the auth header and content type header.
-  - Checks the response and returns the created testimonial `id`.
-
+  - POSTs a testimonial payload with `title`, `content`, and `rating`.
+  - Returns the created testimonial ID from `response.data.Id`.
 - `updateTestimonial(token, id)`
-  - Sends a PUT request to `${BASE_URL}/testimonials/${id}`.
-  - Updates the testimonial message.
-  - Uses the same authorization and content type headers.
-  - Validates the response status is 200.
-
+  - PUTs updated testimonial data to `/testimonials/${id}`.
 - `deleteTestimonial(token, id)`
-  - Sends a DELETE request to `${BASE_URL}/testimonials/${id}`.
-  - Uses the auth header.
-  - Validates the response status is 200.
+  - DELETEs `/testimonials/${id}`.
+- Each step validates the HTTP response.
 
 ### `utils/checks.js`
 
-Provides a reusable validation helper:
+- `checkResponse(res, name)` validates that the response status is 200 or 201.
+- Logs details for failed requests, including status and response body.
 
-- `checkResponse(res, name)` uses K6 `check()`.
-- It verifies the response status equals 200.
-- The check result is labeled with the request name, such as `Login - status is 200`.
+## Outputs
 
-This helper keeps status validation consistent across services.
-
-### `report.html`
-
-A generated output file created by K6 after running `main.js`.
-It contains a formatted HTML performance report for the executed test.
-
-### `summary.json`
-
-A generated JSON output file containing the raw K6 result data.
-It is useful for programmatic analysis, dashboards, or additional reporting.
+- `report.html` is a generated HTML performance report.
+- `summary.json` is the raw K6 run data exported after the test.
 
 ## Notes
 
-- `main.js` imports the flow and the HTML reporter from a remote bundle.
-- The service modules use modular exports so each endpoint interaction is isolated.
-- The scenario module keeps the test workflow separate from the HTTP request details.
-- The helper module keeps check logic in one place.
+- The test is modular: scenarios, services, and helpers are separated for readability and reuse.
+- `config/config.js` is the primary place to update environment details and credentials.
+- `utils/checks.js` centralizes response validation.
 
-## Recommended Next Steps
+## Recommended Improvements
 
-- Update `config/config.js` if you need to point the test at a different API environment.
-- Add more scenarios in `scenarios/` to exercise other API endpoints.
-- Expand `utils/checks.js` to validate response body content and additional status codes.
+- Add more API scenarios under `scenarios/`.
+- Add response body assertions beyond status checks.
+- Parameterize `BASE_URL` and credentials for multiple environments.
+- Increase test coverage by validating returned data from each endpoint.
