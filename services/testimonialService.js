@@ -28,7 +28,7 @@ export function createTestimonial(token) {
 
     try {
         const response = JSON.parse(res.body);
-        // The API returns Id with capital I in the data object
+      
         const testimonialId = response.data?.Id;
         
         if (!testimonialId) {
