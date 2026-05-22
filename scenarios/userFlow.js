@@ -15,8 +15,7 @@ export function userFlow() {
         return;
     }
 
-    // Optional: Add small delay if needed, but try without first
-    // sleep(1);
+
 
     getProfile(token);
 
@@ -27,8 +26,7 @@ export function userFlow() {
         return;
     }
 
-    // Optional: Add small delay if needed
-    // sleep(1);
+   
 
     updateTestimonial(token, id);
     deleteTestimonial(token, id);
