@@ -3,8 +3,14 @@ import { BASE_URL } from '../config/config.js';
 import { checkResponse } from '../utils/checks.js';
 
 export function createTestimonial(token) {
+    const payload = {
+        title: "Amazing Service",
+        content: "This is an amazing service!",
+        rating: 5
+    };
+    
     const res = http.post(`${BASE_URL}/testimonials`,
-        JSON.stringify({ message: "Amazing service!" }),
+        JSON.stringify(payload),
         {
             headers: {
                 Authorization: `Bearer ${token}`,
@@ -14,13 +20,39 @@ export function createTestimonial(token) {
     );
 
     checkResponse(res, 'Create Testimonial');
+    
+    if (res.status !== 200 && res.status !== 201) {
+        console.error(`Create testimonial failed with status: ${res.status}`);
+        return null;
+    }
 
-    return JSON.parse(res.body).id;
+    try {
+        const response = JSON.parse(res.body);
+        // The API returns Id with capital I in the data object
+        const testimonialId = response.data?.Id;
+        
+        if (!testimonialId) {
+            console.error(`No ID in response: ${JSON.stringify(response)}`);
+            return null;
+        }
+        
+        console.log(`✓ Testimonial created with ID: ${testimonialId}`);
+        return testimonialId;
+    } catch (e) {
+        console.error(`Failed to parse response: ${e.message}`);
+        return null;
+    }
 }
 
 export function updateTestimonial(token, id) {
+    const payload = {
+        title: "Updated Amazing Service",
+        content: "This service continues to be amazing!",
+        rating: 5
+    };
+    
     const res = http.put(`${BASE_URL}/testimonials/${id}`,
-        JSON.stringify({ message: "Updated testimonial" }),
+        JSON.stringify(payload),
         {
             headers: {
                 Authorization: `Bearer ${token}`,
@@ -30,6 +62,7 @@ export function updateTestimonial(token, id) {
     );
 
     checkResponse(res, 'Update Testimonial');
+    console.log(`✓ Testimonial ${id} updated successfully`);
 }
 
 export function deleteTestimonial(token, id) {
@@ -40,4 +73,5 @@ export function deleteTestimonial(token, id) {
     });
 
     checkResponse(res, 'Delete Testimonial');
+    console.log(`✓ Testimonial ${id} deleted successfully`);
 }
